@@ -1,11 +1,13 @@
 /*
- *	Main
+ *	Arduino MIDI Player
  *
- *	Setup Arduino and use timer2 to output sine wave
+ *	Setup Arduino and use timer2 to synthesize and output sine wave
+ *
+ *	2016 by ilufang
  */
 
 /*
- * Part of this file contains code modified from
+ * Part of this file contains code modified/referenced from
  * http://interface.khm.de/index.php/lab/interfaces-advanced/arduino-dds-sinewave-generator/
  *
  * DDS Sine Generator mit ATMEGS 168
@@ -30,8 +32,9 @@
 volatile int timer_tick = 0; // seeking position in wave
 volatile unsigned char timer_micro = 0; // timing counter in microseconds
 volatile unsigned short timer_milli = 0; // timing counter in milliseconds
-volatile unsigned long phaccu; // phase accumulator
-volatile unsigned long tword_m; // DDS tuning word m
+volatile unsigned long phaccu_1, phaccu_2, phaccu_3, phaccu_4, phaccu_5, phaccu_6, phaccu_7, phaccu_8; // phase accumulator
+volatile unsigned long tword_m_1, tword_m_2, tword_m_3, tword_m_4, tword_m_5, tword_m_6, tword_m_7, tword_m_8; // DDS tuning word m
+unsigned long phaccu_all;
 
 void setup()
 {
@@ -51,17 +54,27 @@ void loop()
 		if (timer_milli > event_length) { // wait for the next midi event
 			cbi (TIMSK2,TOIE2);
 			loadNextEvent();
+			// calculate new DDS tuning word
+			tword_m_1=POW2_32*PIANO(active_keys[0])/refclk;
+			tword_m_2=POW2_32*PIANO(active_keys[1])/refclk;
+			tword_m_3=POW2_32*PIANO(active_keys[2])/refclk;
+			tword_m_4=POW2_32*PIANO(active_keys[3])/refclk;
+			if (!tword_m_1) phaccu_1 = 0;
+			if (!tword_m_2) phaccu_2 = 0;
+			if (!tword_m_3) phaccu_3 = 0;
+			if (!tword_m_4) phaccu_4 = 0;
 			timer_milli=0;
-			tword_m=POW2_32*PIANO(key)/refclk;  // calculate new DDS tuning word
 			sbi (TIMSK2,TOIE2);
 		}
 	}
 }
 
-// timer2 setup
-// set pre-scaler to 1, PWM mode to phase correct PWM,  16000000/510 = 31372.55 Hz clock
+/*
+ * timer2 setup
+ *
+ * set pre-scaler to 1, PWM mode to phase correct PWM,  16000000/510 = 31372.55 Hz clock
+ */
 void setupTimer2() {
-
 	// Timer2 Clock Pre-scaler to : 1
 	sbi (TCCR2B, CS20);
 	cbi (TCCR2B, CS21);
@@ -76,7 +89,10 @@ void setupTimer2() {
 	cbi (TCCR2B, WGM22);
 
 	// initialize DDS tuning word
-	tword_m=POW2_32*PIANO(key)/refclk;
+	tword_m_1=0;
+	tword_m_2=0;
+	tword_m_3=0;
+	tword_m_4=0;
 
 	// disable Timer0 interrupts to avoid timing distortion
 	cbi (TIMSK0,TOIE0);
@@ -94,15 +110,25 @@ void setupTimer2() {
  * runtime : 8 microseconds ( inclusive push and pop)
  */
 ISR(TIMER2_OVF_vect) {
-	phaccu+=tword_m*4; // soft DDS, phase accumulator with 32 bits
-	timer_tick=phaccu >> 24; // use upper 10 bits for phase accumulator as frequency information
+	// soft DDS, phase accumulator with 32 bits
+	phaccu_1 += tword_m_1;
+	phaccu_2 += tword_m_2;
+	phaccu_3 += tword_m_3;
+	phaccu_4 += tword_m_4;
+	phaccu_5 += tword_m_5;
+
+	// use upper 8 bits for phase accumulator as frequency information
+	int phaccu_all = sine[phaccu_1>>24];
+	phaccu_all += sine[phaccu_2>>24];
+	phaccu_all += sine[phaccu_3>>24];
+	phaccu_all += sine[phaccu_4>>24];
+	phaccu_all += sine[phaccu_5>>24];
 
 	// Write to PWM port 11
-	OCR2A=wave[timer_tick];
-	// OCR2A = pgm_read_byte_near(sine+timer_tick);
+	OCR2A = phaccu_all/KEYBUF_SIZE;
 
-	++timer_micro;
-	if(timer_micro > 125) {
+	// Increment timing counter
+	if(++timer_micro == 31) {
 		++timer_milli;
 		timer_micro=0;
 	}
