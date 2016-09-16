@@ -4,19 +4,14 @@
  *	Implementation
  */
 
+
 #include "midi2wave.h"
 
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
 #define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
 
-// Current position in the sequence array
 short ptr;
 
-/*
- *	Setup
- *
- *	Initialize stuff
- */
 void setupMidi() {
 	for (int i=0; i<MAX_NOTE; ++i)
 		key_vels[i] = 0;
@@ -25,13 +20,7 @@ void setupMidi() {
 	ptr = 0;
 }
 
-/*
- *	Commit notes
- *
- *	Convert notes in the sparse key_vels array into the dense active_keys array
- *	Update LEDs
- */
-void commitNotes() {
+void renderWaveBuffer() {
 	unsigned char leds = 0;
 	note_count = 0;
 	// Update active key buffer with new keys
@@ -70,17 +59,11 @@ void commitNotes() {
 			cbi(PORTD, i+2);
 }
 
-/*
- *	Load next event
- *
- *	Load the midi event(s) of the next non-empty tick
- *	Updates the event_length delay variable
- */
 void loadNextEvent() {
 	if (ptr >= SONG_LEN)
 	{
 		// Restart in 3s
-		// Serial.println("Ended.");
+		Serial.println("Ended.");
 		setupMidi();
 		event_length = 3000;
 		for (int i = 0; i < 7; ++i)
@@ -95,7 +78,7 @@ void loadNextEvent() {
 	if (new_length == 0)
 		loadNextEvent();
 	else {
-		commitNotes();
+		renderWaveBuffer();
 		event_length = new_length;
 	}
 }

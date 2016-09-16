@@ -7,7 +7,7 @@
  */
 
 /*
- * Part of this file contains code adapted from
+ * Part of this file contains code modified/referenced from
  * http://interface.khm.de/index.php/lab/interfaces-advanced/arduino-dds-sinewave-generator/
  *
  * DDS Sine Generator mit ATMEGS 168
@@ -34,11 +34,12 @@ volatile unsigned char timer_micro = 0; // timing counter in microseconds
 volatile unsigned short timer_milli = 0; // timing counter in milliseconds
 volatile unsigned long phaccu_1, phaccu_2, phaccu_3, phaccu_4, phaccu_5, phaccu_6, phaccu_7, phaccu_8; // phase accumulator
 volatile unsigned long tword_m_1, tword_m_2, tword_m_3, tword_m_4, tword_m_5, tword_m_6, tword_m_7, tword_m_8; // DDS tuning word m
+unsigned long phaccu_all;
 
 void setup()
 {
 	Serial.begin(9600);
-	// Serial.println("Hello");
+	Serial.println("Hello");
 	for (int i = 2; i <= 8; ++i)
 		pinMode(i,OUTPUT); // LED output
 
@@ -58,18 +59,10 @@ void loop()
 			tword_m_2=POW2_32*PIANO(active_keys[1])/refclk;
 			tword_m_3=POW2_32*PIANO(active_keys[2])/refclk;
 			tword_m_4=POW2_32*PIANO(active_keys[3])/refclk;
-			tword_m_5=POW2_32*PIANO(active_keys[4])/refclk;
-			// tword_m_6=POW2_32*PIANO(active_keys[5])/refclk;
-			// tword_m_7=POW2_32*PIANO(active_keys[6])/refclk;
-			// tword_m_8=POW2_32*PIANO(active_keys[7])/refclk;
 			if (!tword_m_1) phaccu_1 = 0;
 			if (!tword_m_2) phaccu_2 = 0;
 			if (!tword_m_3) phaccu_3 = 0;
 			if (!tword_m_4) phaccu_4 = 0;
-			if (!tword_m_5) phaccu_5 = 0;
-			// if (!tword_m_6) phaccu_6 = 0;
-			// if (!tword_m_7) phaccu_7 = 0;
-			// if (!tword_m_8) phaccu_8 = 0;
 			timer_milli=0;
 			sbi (TIMSK2,TOIE2);
 		}
@@ -100,10 +93,6 @@ void setupTimer2() {
 	tword_m_2=0;
 	tword_m_3=0;
 	tword_m_4=0;
-	tword_m_5=0;
-	// tword_m_6=0;
-	// tword_m_7=0;
-	// tword_m_8=0;
 
 	// disable Timer0 interrupts to avoid timing distortion
 	cbi (TIMSK0,TOIE0);
@@ -113,11 +102,12 @@ void setupTimer2() {
 }
 
 /*
- * Timer2 Interrupt Service Routine
+ * Timer2 Interrupt Service
  *
  * Running at 31372,550 KHz = 32uSec
  * this is the timebase REFCLOCK for the DDS generator
  * FOUT = (M (REFCLK)) / (2 exp 32)
+ * runtime : 8 microseconds ( inclusive push and pop)
  */
 ISR(TIMER2_OVF_vect) {
 	// soft DDS, phase accumulator with 32 bits
@@ -126,19 +116,13 @@ ISR(TIMER2_OVF_vect) {
 	phaccu_3 += tword_m_3;
 	phaccu_4 += tword_m_4;
 	phaccu_5 += tword_m_5;
-	// phaccu_6 += tword_m_6;
-	// phaccu_7 += tword_m_7;
-	// phaccu_8 += tword_m_8;
 
 	// use upper 8 bits for phase accumulator as frequency information
-	long phaccu_all = sine[phaccu_1>>24];
+	int phaccu_all = sine[phaccu_1>>24];
 	phaccu_all += sine[phaccu_2>>24];
 	phaccu_all += sine[phaccu_3>>24];
 	phaccu_all += sine[phaccu_4>>24];
 	phaccu_all += sine[phaccu_5>>24];
-	// phaccu_all += sine[phaccu_6>>24];
-	// phaccu_all += sine[phaccu_7>>24];
-	// phaccu_all += sine[phaccu_8>>24];
 
 	// Write to PWM port 11
 	OCR2A = phaccu_all/KEYBUF_SIZE;

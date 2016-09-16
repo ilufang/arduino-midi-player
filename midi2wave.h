@@ -12,7 +12,8 @@
 #include "sequence.h"
 
 #define MAX_NOTE 128
-#define KEYBUF_SIZE 5 // Max notes for processing to keep up with timer
+#define KEYBUF_SIZE 5
+#define SINE_SAMPLE_SIZE 256
 
 #define PIANO(key) (key?(pow(1.0594630943592952645618252949463,key+1-32-49+24)*440):0)
 
@@ -28,6 +29,9 @@ volatile char note_count = 0;
 // The current length in milliseconds
 int event_length = 0;
 
+// The primary key
+char key = 61;
+
 /*
  *	Setup
  *
@@ -36,18 +40,18 @@ int event_length = 0;
 void setupMidi();
 
 /*
- *	Commit notes
+ *	Render wave buffer
  *
- *	Convert notes in the sparse key_vels array into the dense active_keys array
- *	Update LEDs
+ *	Generate the wave buffer with current notes
  */
-void commitNotes();
+void renderWaveBuffer();
 
 /*
  *	Load next event
  *
- *	Load the midi event(s) of the next non-empty tick
- *	Updates the event_length delay variable
+ *	Load the next midi note/chord
+ *	Updates the next delay variable
+ *	Updates LEDs
  */
 void loadNextEvent();
 
